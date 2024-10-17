@@ -103,9 +103,11 @@ struct cpu_stats {
 static sig_atomic_t sigint = 0;
 
 struct packet *packets = NULL;
+size_t pcapacity = 0;
 size_t plen = 0;
 
 struct packet_dyn *packet_dyn = NULL;
+size_t dcapacity = 0;
 size_t dlen = 0;
 
 static const char *short_options = "d:c:n:t:vJhS:rk:i:o:VRs:P:eE:pu:g:CHQqD:b:";

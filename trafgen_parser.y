@@ -46,6 +46,8 @@
 #define YYDEBUG			0
 #define YYLTYPE_IS_TRIVIAL	1
 
+#define INITIAL_CAPACITY	128
+  
 extern FILE *yyin;
 extern int yylex(void);
 extern void yy_scan_string(char *);
@@ -55,6 +57,7 @@ extern int yylineno;
 extern char *yytext;
 
 extern struct packet *packets;
+extern size_t pcapacity;
 extern size_t plen;
 
 #define packet_last		(plen - 1)
@@ -62,6 +65,7 @@ extern size_t plen;
 #define payload_last		(packets[packet_last].len - 1)
 
 extern struct packet_dyn *packet_dyn;
+extern size_t dcapacity;
 extern size_t dlen;
 
 #define packetd_last		(dlen - 1)
@@ -169,26 +173,42 @@ static inline void __setup_new_csum16(struct csum16 *s, off_t from, off_t to,
 
 struct packet *realloc_packet(void)
 {
-	uint32_t i;
+	size_t i;
 
 	if (test_ignore())
 		return NULL;
 
 	plen++;
-	packets = xrealloc(packets, plen * sizeof(*packets));
 
-	__init_new_packet_slot(&packets[packet_last]);
+	if (plen >= pcapacity) {
+		pcapacity = ((pcapacity == 0) ?
+		             INITIAL_CAPACITY :
+			     (3 * pcapacity / 2));
+
+		packets = xrealloc(packets, pcapacity * sizeof(*packets));
+
+		for (i = packet_last; i < pcapacity; i++) {
+			__init_new_packet_slot(&packets[i]);
+			packets[i].id = i;
+		}
+	}
 
 	dlen++;
-	packet_dyn = xrealloc(packet_dyn, dlen * sizeof(*packet_dyn));
 
-	__init_new_counter_slot(&packet_dyn[packetd_last]);
-	__init_new_randomizer_slot(&packet_dyn[packetd_last]);
-	__init_new_csum_slot(&packet_dyn[packetd_last]);
-	__init_new_fields_slot(&packet_dyn[packetd_last]);
+	if (dlen >= dcapacity) {
+		dcapacity = ((dcapacity == 0) ?
+		             INITIAL_CAPACITY :
+			     (3 * dcapacity / 2));
 
-	for (i = 0; i < plen; i++)
-		packets[i].id = i;
+		packet_dyn = xrealloc(packet_dyn, dcapacity * sizeof(*packet_dyn));
+
+		for (i = packetd_last; i < dcapacity; i++) {
+			__init_new_counter_slot(&packet_dyn[i]);
+			__init_new_randomizer_slot(&packet_dyn[i]);
+			__init_new_csum_slot(&packet_dyn[i]);
+			__init_new_fields_slot(&packet_dyn[i]);
+		}
+	}
 
 	return &packets[packet_last];
 }
